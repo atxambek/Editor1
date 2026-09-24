@@ -1,0 +1,82 @@
+name: Build Stickman Sync APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find ZIP
+        shell: bash
+        run: |
+          set -e
+
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ZIP topilmadi!"
+            exit 1
+          fi
+
+          echo "ZIP: $ZIP_FILE"
+          unzip -o "$ZIP_FILE"
+
+          echo "Files:"
+          find . -maxdepth 3 -type f | head -100
+
+      - name: Find Android project
+        shell: bash
+        run: |
+          set -e
+
+          if [ ! -f "app/build.gradle.kts" ]; then
+            echo "Android project root topilmadi."
+
+            APP_GRADLE=$(find . -path "*/app/build.gradle.kts" | head -n 1)
+
+            if [ -z "$APP_GRADLE" ]; then
+              echo "app/build.gradle.kts topilmadi!"
+              exit 1
+            fi
+
+            APP_DIR=$(dirname "$APP_GRADLE")
+            PROJECT_DIR=$(dirname "$APP_DIR")
+
+            echo "Project directory: $PROJECT_DIR"
+
+            shopt -s dotglob
+            cp -r "$PROJECT_DIR"/* .
+          fi
+
+          echo "Android project ready."
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Build APK
+        run: |
+          gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Find APK
+        run: |
+          find . -type f -name "*.apk" -print
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stickman-Sync-APK
+          path: "**/build/outputs/apk/debug/*.apk"
+          if-no-files-found: error
